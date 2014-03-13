@@ -6,19 +6,6 @@ With this script, you can publish the files from the git bare repository automat
 You can specify following actions to the ini file.
 
 copy action:
-   Checkout the file(s) under destination directory.
-
-scp action:
-   Bad Logic.
-   Copy all the file(s) to target server with scp command.
-   Can not erase the git removed files.
-
-ftp action:
-   Bad Logic.
-   Copy all the file(s) to target server with ncftpput command.
-   Can not erase the git removed files.
-
-copy action:
    Checkout the files under destination directory.
 
 scp action:
