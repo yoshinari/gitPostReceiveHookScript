@@ -22,7 +22,7 @@
 # Read post-receive action definitions from ../etc/post-receive.ini file.
 #
 # This script contains cfg_parser function, which is part of the "Drupal Deployment Skeleton".
-#       https://github.com/fluxsause/DrupalDeploySkel
+#       https://github.com/fluxsauce/DrupalDeploySkel
 #
 #############
 # MIT license
