@@ -10,7 +10,7 @@ With this script, you can publish the files from the git bare repository automat
 
 ##### scp action
 * Copy all the files to taget server with scp command.
-* Erase the git removed files wich ssh command, but can not erase empty directory.
+* Erase the git removed files with ssh command, but can not erase empty directory.
 
 ##### ftp action
 * Copy all the files to target server with ncftpput command.
@@ -20,9 +20,9 @@ With this script, you can publish the files from the git bare repository automat
 
 * Make post-receive.ini file from post-receive.ini.sample file, then
 update the definition to fit your bare repository.
-* change file mode to 600: chmod 600 post-receive.ini
+* Change file mode to 600: chmod 600 post-receive.ini
 * Place etc/post-receive.ini and hooks/post-receive file under your bare repository.
-* change file mode to runnable: chmod +x post-receive
+* Change file mode to runnable: chmod +x post-receive
 * If you use ftp mode, the server must be installed ftp and ncftp program.
 
 ### Credits
