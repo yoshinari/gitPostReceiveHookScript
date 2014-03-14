@@ -7,28 +7,25 @@
 # 
 #
 # copy action:
-#       Checkout the files under destination directory.
+#	Checkout the file(s) under destination directory 
 #
 # scp action:
-#       Bad Logic.
-#       Copy all the files to target server with scp command.
-#       Can not remove the "git removed files".
+#	Copy all the file(s) to taget server with scp command.
+#	Erase the git removed files with ssh command, but can not erase empty directory.
 #
 # ftp action:
-#       Bad Logic.
-#       Copy all the files to target server with ncftpput command.
-#       Can not remove the "git removed files".
+#	Copy all the file(s) to target server with ncftpput command.
+#	Erase the git removed files with ftp command, but can not erase empty directory.
 #
-# Read post-receive action definitions from ../etc/post-receive.ini file.
+# Read post-receive action definition(s) from ../etc/post-receive.ini file.
 #
-# This script contains cfg_parser function, which is part of the "Drupal Deployment Skeleton".
-#       https://github.com/fluxsauce/DrupalDeploySkel
+# This script contains cfg_parser function:
+#	https://github.com/fluxsause/DrupalDeploySkel
 #
 #############
 # MIT license
 #
 # Copyright (c) 2014 Yoshinari Toda
-#   https://github.com/yoshinari/gitPostRecieveHookScript
 #
 # Drupal Deployment Skeleton (excluding contributed code) is 
 # Copyright (c) 2011 Jon Peck and FluxSauce
@@ -53,47 +50,61 @@
 #
 
 function cfg_parser (){
-        ini="$(<$1)"                # read the file
-        ini="${ini//[/\[}"          # escape [
-        ini="${ini//]/\]}"          # escape ]
-        IFS=$'\n' && ini=( ${ini} ) # convert to line-array
-        ini=( ${ini[*]//;*/} )      # remove comments with ;
-        ini=( ${ini[*]/\    =/=} )  # remove tabs before =
-        ini=( ${ini[*]/=\   /=} )   # remove tabs be =
-        ini=( ${ini[*]/\ =\ /=} )   # remove anything with a space around =
-        ini=( ${ini[*]/#\\[/\}$'\n'cfg.section.} ) # set section prefix
-        ini=( ${ini[*]/%\\]/ \(} )    # convert text2function (1)
-        ini=( ${ini[*]/=/=\( } )    # convert item to array
-        ini=( ${ini[*]/%/ \)} )     # close array parenthesis
-        ini=( ${ini[*]/%\\ \)/ \\} ) # the multiline trick
-        ini=( ${ini[*]/%\( \)/\(\) \{} ) # convert text2function (2)
-        ini=( ${ini[*]/%\} \)/\}} ) # remove extra parenthesis
-        ini[0]="" # remove first element
-        ini[${#ini[*]} + 1]='}'    # add the last brace
-        eval "$(echo "${ini[*]}")" # eval the result
+	ini="$(<$1)"                # read the file
+	ini="${ini//[/\[}"          # escape [
+	ini="${ini//]/\]}"          # escape ]
+	IFS=$'\n' && ini=( ${ini} ) # convert to line-array
+	ini=( ${ini[*]//;*/} )      # remove comments with ;
+	ini=( ${ini[*]/\    =/=} )  # remove tabs before =
+	ini=( ${ini[*]/=\   /=} )   # remove tabs be =
+	ini=( ${ini[*]/\ =\ /=} )   # remove anything with a space around =
+	ini=( ${ini[*]/#\\[/\}$'\n'cfg.section.} ) # set section prefix
+	ini=( ${ini[*]/%\\]/ \(} )    # convert text2function (1)
+	ini=( ${ini[*]/=/=\( } )    # convert item to array
+	ini=( ${ini[*]/%/ \)} )     # close array parenthesis
+	ini=( ${ini[*]/%\\ \)/ \\} ) # the multiline trick
+	ini=( ${ini[*]/%\( \)/\(\) \{} ) # convert text2function (2)
+	ini=( ${ini[*]/%\} \)/\}} ) # remove extra parenthesis
+	ini[0]="" # remove first element
+	ini[${#ini[*]} + 1]='}'    # add the last brace
+	eval "$(echo "${ini[*]}")" # eval the result
 }
 echo "*** UPDATE ***"
 read old_commit new_commit refname
-branch=`echo $refname | cut -d/ -f3`    # master, develop, ...
+branch=`echo $refname | cut -d/ -f3`	# master, develop, ...
 echo "branch:" $branch
 cfg_parser 'etc/post-receive.ini'
 cfg.section.$branch
 if [ "$mode" == "copy" ]; then
-        GIT_WORK_TREE=$destination git checkout -f $branch
-        echo "Changes pushed $branch under destination:$destination"
+	GIT_WORK_TREE=$destination git checkout -f $branch
+	echo "Changes pushed $branch under destination:$destination"
 elif [ "$mode" == "scp" -o "$mode" == "ftp" ]; then
-        #### BAD LOGIC SECTION
-        gitFiles="/tmp/$(basename $0).$$.tmp"
-        `mkdir ${gitFiles}`
-        GIT_WORK_TREE=$gitFiles git checkout -f $branch
-        if [ "$mode" == "scp" ]; then
-                `scp -r $gitFiles/* $ssh_config:$destination`
-                echo "All files pushed ${branch}'s server with scp command."
-        else
-                `ncftpput -u $userid -p $password -P $portNumber -t $timeout -m -R -r $retry $server $destination $gitFiles/*`
-                echo "All files pushed ${branch}'s server with ncftpput command."
-        fi
-        `rm -rf ${gitFiles}`
+	gitFiles="/tmp/$(basename $0).$$.tmp"
+	gitInput="$gitFiles/input"
+	gitUpdate="$gitFiles/update"
+	gitDelete="$gitFiles/delete.txt"
+	`mkdir $gitFiles`
+	`mkdir $gitInput`
+	`mkdir $gitUpdate`
+	GIT_WORK_TREE=$gitInput git checkout -f $branch
+	`git log --name-status -p -1 | egrep "^[AM]\s.*" | awk '{print $2}' | tar -C $gitInput -cvf - -T - | tar -xvf - -C $gitUpdate`
+	if [ "$mode" == "scp" ]; then
+		`scp -r $gitUpdate/* $ssh_config:$destination`
+		`echo cd $destination > $gitDelete`
+		`git log --name-status -p -1 | egrep "^D\s.*" | awk '{print "rm " $2}' >> $gitDelete`
+		`ssh $ssh_config sh < $gitDelete`
+		echo "All files pushed ${branch}'s server with scp command."
+	else
+		`ncftpput -u $userid -p $password -P $portNumber -t $timeout -m -R -r $retry $server $destination $gitUpdate/*`
+		`echo open $server $portNumber > $gitDelete`
+		`echo user $userid $password >> $gitDelete`
+		`echo cd $destination >> $gitDelete`
+		`git log --name-status -p -1 | egrep "^D\s.*" | awk '{print "del " $2}' >> $gitDelete`
+		`echo bye >> $gitDelete`
+		`ftp -n < $gitDelete`
+		echo "All files pushed ${branch}'s server with ncftpput command."
+	fi
+	`rm -rf $gitFiles`
 else
-        echo "** Rule does not defined for $branch , mode: $mode **"
+	echo "** Rule does not defined for $branch , mode: $mode **"
 fi
