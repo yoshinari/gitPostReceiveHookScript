@@ -80,29 +80,26 @@ if [ "$mode" == "copy" ]; then
 	echo "Changes pushed $branch under destination:$destination"
 elif [ "$mode" == "scp" -o "$mode" == "ftp" ]; then
 	gitFiles="/tmp/$(basename $0).$$.tmp"
-	gitInput="$gitFiles/input"
 	gitUpdate="$gitFiles/update"
 	gitDelete="$gitFiles/delete.txt"
 	`mkdir $gitFiles`
-	`mkdir $gitInput`
 	`mkdir $gitUpdate`
-	GIT_WORK_TREE=$gitInput git checkout -f $branch
-	`git log --name-status -p -1 | egrep "^[AM]\s.*" | awk '{print $2}' | tar -C $gitInput -cvf - -T - | tar -xvf - -C $gitUpdate`
+    git archive refs/heads/$branch `git log --name-status refs/heads/$branch -p -1 | egrep "^[AM]\s.*" | awk '{print $2}'` | tar -C $gitUpdate -xvf -
 	if [ "$mode" == "scp" ]; then
 		`scp -r $gitUpdate/* $ssh_config:$destination`
 		`echo cd $destination > $gitDelete`
-		`git log --name-status -p -1 | egrep "^D\s.*" | awk '{print "rm " $2}' >> $gitDelete`
+		`git log --name-status refs/heads/$branch -p -1 | egrep "^D\s.*" | awk '{print "rm " $2}' >> $gitDelete`
 		`ssh $ssh_config sh < $gitDelete`
-		echo "All files pushed ${branch}'s server with scp command."
+		echo "All updated files were pushed to ${branch}'s server with scp command."
 	else
 		`ncftpput -u $userid -p $password -P $portNumber -t $timeout -m -R -r $retry $server $destination $gitUpdate/*`
 		`echo open $server $portNumber > $gitDelete`
 		`echo user $userid $password >> $gitDelete`
 		`echo cd $destination >> $gitDelete`
-		`git log --name-status -p -1 | egrep "^D\s.*" | awk '{print "del " $2}' >> $gitDelete`
+		`git log --name-status refs/heads/$branch -p -1 | egrep "^D\s.*" | awk '{print "del " $2}' >> $gitDelete`
 		`echo bye >> $gitDelete`
 		`ftp -n < $gitDelete`
-		echo "All files pushed ${branch}'s server with ncftpput command."
+		echo "All updated files were pushed to ${branch}'s server with ncftpput command."
 	fi
 	`rm -rf $gitFiles`
 else
